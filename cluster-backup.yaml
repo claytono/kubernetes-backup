@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cluster-backup
+  namespace: kube-system
+spec:
+  template:
+    metadata:
+      name: cluster-backup
+      annotations:
+        scheduler.alpha.kubernetes.io/tolerations: |
+          [
+            {
+              "key": "dedicated",
+              "operator": "Equal",
+              "value": "master",
+              "effect": "NoSchedule"
+            }
+          ]
+    spec:
+      containers:
+      - name: cluster-backup
+        command:
+        - /backup.sh
+        image: gcr.io/google_containers/etcd-amd64:3.0.17
+        volumeMounts:
+        - mountPath: /etc/ssl/certs
+          name: certs
+          readOnly: true
+        - mountPath: /var/lib/etcd
+          name: etcd
+          readOnly: true
+        - mountPath: /etc/kubernetes
+          name: k8s
+          readOnly: true
+        - mountPath: /backups
+          name: backups
+      hostNetwork: true
+      volumes:
+      - hostPath:
+          path: /etc/ssl/certs
+        name: certs
+      - hostPath:
+          path: /var/lib/etcd
+        name: etcd
+      - hostPath:
+          path: /etc/kubernetes
+        name: k8s
+      - nfs:
+          server: fs1.oneill.net
+          path: /volume1/k8s-pv/backups
+        name: backups
+      restartPolicy: OnFailure
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
